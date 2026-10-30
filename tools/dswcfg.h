@@ -1,4 +1,9 @@
-/* auto-generated from /tmp/dswave-helper.log */
+/* Captured DSWave bring-up control sequence for native replay (dswbulk).
+ * Transcribed from the helper's "ctl OUT ... data=" log lines of one
+ * successful DSWave session (helper log on Linux, DSW_DEBUG=1); the same
+ * control writes the Windows app performs between power-up and Start.
+ * Regenerate by replaying a new capture the same way. The count is derived
+ * from the array, never hardcoded. */
 static const struct { unsigned char n; unsigned char d[16]; } cfg[] = {
   {3,{0xf0,0x02,0x00}},
   {3,{0xf2,0x02,0x00}},
@@ -1203,4 +1208,4 @@ static const struct { unsigned char n; unsigned char d[16]; } cfg[] = {
   {3,{0x00,0x01,0x00}},
   {3,{0xf9,0x00,0x00}},
 };
-static const int cfg_count = 1202;
+static const int cfg_count = (int)(sizeof(cfg) / sizeof(cfg[0]));

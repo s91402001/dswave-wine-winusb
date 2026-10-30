@@ -55,11 +55,21 @@ static int attempt(libusb_device_handle *h, unsigned char *buf, long len, int ch
     ctl(h, 0xb0, "\xfe\x01\x00", 3);
     ctl(h, 0xb1, "\xff\x02\x00", 3);
     st2(h, "before prog");
-    /* wait until the device reports 03 (idle, unconfigured) like Windows */
-    for (i = 0; i < 10; i++) {
-        s = st2(h, "idle poll");
-        if (s == 0x03) break;
-        ms(1000);
+    /* hard precondition: the device must report idle (03) before PROG;
+     * programming while busy (01) is what left the FPGA unconfigured in v1. */
+    {
+        int idle = 0;
+        for (i = 0; i < 10; i++)
+        {
+            s = st2(h, "idle poll");
+            if (s == 0x03) { idle = 1; break; }
+            ms(1000);
+        }
+        if (!idle)
+        {
+            printf("-- idle wait timed out (b2=%d), skipping PROG --\n", s);
+            return 0;
+        }
     }
     ctl(h, 0xb0, "\xfc\xe8\x1d", 3);   /* FPGA PROG pulse */
     ctl(h, 0xb0, "\xfd\x07\x00", 3);   /* FPGA init start */
@@ -153,7 +163,7 @@ int main(int argc, char **argv)
         if (i + 1 < attempts) {
             printf("-- retrying after programmer stop --\n");
             ctl(h, 0xb1, "\xf2\x02\x00", 3);
-            ms(985000);
+            ms(1000); /* ms() takes milliseconds: 1 s, not 985000 */
         }
     }
 

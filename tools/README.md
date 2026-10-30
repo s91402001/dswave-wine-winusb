@@ -28,8 +28,12 @@ gcc -O2 $(pkg-config --cflags libusb-1.0) -o dswfpga dswfpga.c $(pkg-config --li
 | `chunk` | 405504 | libusb request size; frames are 5,005,312 bytes |
 | `poll84` | 0 | 1 = also poll endpoint 0x84 in a thread |
 
-It resets the device, claims interface 0, sends the capture-start sequence
-(`03 01 00`, `02 00 00`, `01 01 00`) and reads until an error or the time limit.
+It resets the device, claims interface 0, **replays the application's full
+bring-up configuration** (`dswcfg.h`: 1,202 captured control writes from one
+real DSWave session, transcribed from the helper's log), then runs the
+stop→start recovery sequence and reads until an error or the time limit.
+The FPGA must already be configured — `dswbulk` does not upload the
+bitstream (that is `dswfpga`'s job).
 
 Typical good result:
 
@@ -46,16 +50,11 @@ the device/link, not at the shim.
 ## dswfpga — replay the FPGA bitstream upload
 
 ```bash
-./dswfpga [reset] [chunk]
+./dswfpga [reset] [chunk] [attempts]
 ```
 
-| Argument | Default | Meaning |
-|---|---|---|
-| `reset` | 0 | 1 = `libusb_reset_device()` before the sequence |
-| `chunk` | 0 | 0 = one 466,408-byte transfer; otherwise chunk size |
-
-Reads `/tmp/dswave-fpga.bin` (dump it with `DSW_FPGA_RECOVER` or the helper's
-built-in bitstream capture), sends the pre-upload sequence
+Reads `/tmp/dswave-fpga.bin` (the helper automatically dumps the first large
+`0x02` OUT it sees to that file), then sends the pre-upload sequence
 (`b1 f0/f2/ff`, `b0 fe fe ff`, `b0 fe 01 00`, `b1 ff`, `b0 fc e8 1d`,
 `b0 fd 07 00`) with **15 ms between commands**, waits until `b2` reports
 `03 00` (idle) before PROG, writes the bitstream to endpoint `0x02` and then

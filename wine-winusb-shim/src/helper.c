@@ -712,8 +712,13 @@ static int fpga_b2(libusb_device_handle *h)
  * 03 00 (idle, unconfigured) right before the PROG pulse, spacing commands
  * ~15 ms apart. Uploading while the device is still busy (b2 == 01) leaves
  * the FPGA unconfigured. The zero-length IN seen in the pcap is host-side
- * only (the device has no EP 0x82), so it is not replayed here. */
-static void fpga_prepare(libusb_device_handle *h)
+ * only (the device has no EP 0x82), so it is not replayed here.
+ * Returns 0 when the device may be programmed (or is already configured),
+ * or a negative libusb error if the attempt must be aborted. The USB reset
+ * is kept because it also recovers devices that are wedged from an earlier
+ * session; it re-enumerates the device, which the helper's live REQ_LIST
+ * cache absorbs. */
+static int fpga_prepare(libusb_device_handle *h)
 {
     /* pre-PROG commands (PROG + init are issued after the idle wait) */
     static const struct { uint8_t req; uint8_t d[3]; } pre[] = {
@@ -725,8 +730,16 @@ static void fpga_prepare(libusb_device_handle *h)
         {0xb0, {0xfc, 0xe8, 0x1d}}, {0xb0, {0xfd, 0x07, 0x00}},
     };
     struct timespec ts = {0, 15 * 1000 * 1000}; /* 15 ms */
+    struct timespec one = {1, 0};
     size_t i;
     int r;
+
+    r = fpga_b2(h);
+    if (r >= 0 && (r & 0x80))
+    {
+        fprintf(stderr, "helper: fpga prepare: already configured (b2=%02x), skip\n", r);
+        return 0;
+    }
 
     libusb_release_interface(h, 0);
     r = libusb_reset_device(h);
@@ -734,6 +747,8 @@ static void fpga_prepare(libusb_device_handle *h)
     libusb_set_configuration(h, 1);
     r = libusb_claim_interface(h, 0);
     fprintf(stderr, "helper: fpga prepare: claim -> %s\n", libusb_error_name(r));
+    if (r < 0)
+        return r;
 
     for (i = 0; i < sizeof(pre) / sizeof(pre[0]); i++)
     {
@@ -741,15 +756,19 @@ static void fpga_prepare(libusb_device_handle *h)
                                 (unsigned char *)pre[i].d, 3, 2000);
         nanosleep(&ts, NULL);
     }
-    /* wait for the idle state before pulsing PROG */
+    /* hard precondition: never pulse PROG unless the device reports idle */
     for (i = 0; i < 10; i++)
     {
         r = fpga_b2(h);
         if (r == 0x03)
             break;
-        struct timespec one = {1, 0};
         fprintf(stderr, "helper: fpga prepare: not idle yet b2=%d, waiting\n", r);
         nanosleep(&one, NULL);
+    }
+    if (r != 0x03)
+    {
+        fprintf(stderr, "helper: fpga prepare: idle wait failed (b2=%d), refusing PROG\n", r);
+        return LIBUSB_ERROR_BUSY;
     }
     for (i = 0; i < sizeof(prog) / sizeof(prog[0]); i++)
     {
@@ -757,6 +776,7 @@ static void fpga_prepare(libusb_device_handle *h)
                                 (unsigned char *)prog[i].d, 3, 2000);
         nanosleep(&ts, NULL);
     }
+    return 0;
 }
 
 struct bulk_wait
@@ -865,7 +885,18 @@ static void do_bulk(struct conn *c, const struct shim_req *req, struct shim_resp
         return;
     }
     if (fpga_recover_enabled() && !is_in && ep == 0x02 && req->len > 100000)
-        fpga_prepare(h);
+    {
+        int pr = fpga_prepare(h);
+        if (pr < 0)
+        {
+            pthread_mutex_unlock(&ep_lock[id][ep]);
+            free(buf);
+            resp->status = pr;
+            fprintf(stderr, "helper: fpga prepare failed (%s), refusing bulk OUT\n",
+                    libusb_error_name(pr));
+            return;
+        }
+    }
 
     {
         static uint32_t chunk;

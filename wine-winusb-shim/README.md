@@ -82,4 +82,7 @@ WINEPREFIX=~/.wine-dswave ./scripts/uninstall.sh   # 還原
 * 每筆 bulk 傳輸多一次 loopback TCP hop；低速率可用，全速需改 unixlib。
 * `setupapi=native` 會讓整個 prefix 都使用墊片（其餘呼叫已 forward）。
 * FPGA 設定需要 helper 的 idle-wait 重放（`DSW_FPGA_RECOVER=1`，預設）；
-  純 App 序列在部分狀態下會把 FPGA 留在未設定。
+  純 App 序列在部分狀態下會把 FPGA 留在未設定。`fpga_prepare()` 內含一次
+  USB reset（用於救回上一 session 卡死的裝置）；它會使裝置重新列舉，
+  helper 的 REQ_LIST 快取會自動追上新的 bus/addr。閒置等待失敗時 helper
+  會拒絕該筆上傳（回 `LIBUSB_ERROR_BUSY`），不會硬送 PROG。

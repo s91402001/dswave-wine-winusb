@@ -774,3 +774,36 @@ app: usb device is not ready: ERROR
 - `DSW_FPGA_RECOVER` 預設值改為 `1`（`0` 可關閉）。
 
 **狀態總結：列舉 → FPGA 設定 → 擷取 → Stop → 再擷取，全程不需 Windows。**
+
+---
+
+## 2026-10-30 第五節：全分支審查與修正（review pass）
+
+整體審查（4 commits d002f90..945a015）後的修正：
+
+1. `tools/dswfpga.c`：重試 delay 的 units bug（`ms(985000)`＝985 秒）改為 1 秒。
+2. idle-wait 改為**硬前提**：helper 與 dswfpga 在等不到 `03 00` 時**拒絕**
+   PROG/上傳（helper 回 `LIBUSB_ERROR_BUSY`，App 會自行重試）；
+   helper 進入 `fpga_prepare()` 先讀 b2，已是 `0x8x` 就跳過（不重設、不重編程）。
+   `libusb_claim_interface()` 失敗會中止而非硬續。
+3. 保留 `fpga_prepare()` 內的 USB reset：用於救回上一 session 卡死的裝置；
+   它使裝置重新列舉，REQ_LIST 快取自動追上新位址（已在文件註明）。
+4. `tools/dswcfg.h`：補上來源說明（由 helper 控制日誌轉錄），
+   `cfg_count` 改由陣列推導；`tools/README.md` 去重並補 dswbulk 的
+   config-replay 說明；分析文件 §2/§4 標記為歷史（v3 为准）。
+
+### Review Focus 證據補記
+- **取消以 STATUS_CANCELLED 完成**：`winusb.log` 有
+  `worker post seq=… bytes=0 status=CANCELLED`（多次）。
+- **reset 後位址追蹤**：整晚裝置多次重新列舉（Bus 008 dev 022→027），
+  helper 每次都对新位址成功 open/claim；App 端 session 未受影響。
+- **單筆 466,408 URB**：`upload(one) -> 0 xfer=466408/466408`（原生）、
+  App 側 `FPGA configure done: 466408`。
+- **舊 handle 在 helper 重啟後作廢**：未专门測試（本次未出現該路徑），列為後續驗證項。
+
+### 未結案
+- 原生 `dswfpga` 設定成功後，`dswbulk`（含完整 config replay）仍讀不到 header
+  （`header -> -7`）。原因未查；不影響 Wine 路徑（App 自己的初始化完整）。
+
+### 修正後最終回歸（17:17，冷裝置、全預設）
+`FPGA configure done: 466408` → READY；idle 等待 0 次重試、無 refusing。
