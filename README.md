@@ -174,6 +174,10 @@ These binaries are **not** part of the repository; only their versions are recor
 | `output.pcap` | 129,023,508 | Windows USBPcap baseline (normal capture) |
 | `fpga1.pcap` | 8,920,535 | Windows USBPcap baseline (FPGA configure + run) |
 
+The two captures are included **gzip-compressed** under
+[`usbpcap/data/`](usbpcap/data/README.md) (2.0 MB and 29.8 MB); the installer is
+not redistributed.
+
 * Device: `2a0e:0080`, USB 3.0 SuperSpeed (5 Gb/s).
 * Wine: `devel` build, 11.x.
 * Baseline transport on Windows: 405,504-byte bulk IN transfers, ~22 ms apart

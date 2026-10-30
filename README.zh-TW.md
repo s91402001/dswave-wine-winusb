@@ -172,6 +172,9 @@ WINEPREFIX=~/.wine-dswave wine "C:\\Program Files\\DSWave\\DSWave.exe" -l 5
 | `output.pcap` | 129,023,508 | Windows USBPcap 基準（一般擷取） |
 | `fpga1.pcap` | 8,920,535 | Windows USBPcap 基準（FPGA 設定 + 擷取） |
 
+兩份擷取檔以 **gzip 壓縮**形式收在
+[`usbpcap/data/`](usbpcap/data/README.md)（2.0 MB 與 29.8 MB）；安裝檔不重新散布。
+
 * 裝置：`2a0e:0080`，USB 3.0 SuperSpeed（5 Gb/s）
 * Wine：`devel` 分支，11.x
 * Windows 基準傳輸：bulk IN 405,504 bytes、間隔約 22 ms（≈18.6 MB/s）

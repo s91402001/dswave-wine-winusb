@@ -4,9 +4,9 @@
 
 目的：取得 **Windows 上正常運作** 的 USB 行為，作為 Wine 墊片的比對基準。
 
-> 錄下來的 `.pcap` **不進 repo**（`.gitignore` 已排除）。版本與大小記在
-> 首頁 README 的「Tested versions」：`fpga1.pcap`（8,920,535 bytes）、
-> `output.pcap`（129,023,508 bytes）。
+> 參考擷取檔以 **gzip 壓縮**放在 [`data/`](data/README.md)：
+> `fpga1.pcap.gz`（2.0 MB）與 `output.pcap.gz`（29.8 MB），含 sha256 與內容摘要。
+> 原始 `.pcap` 仍被 `.gitignore` 排除（解壓後不會誤入版控）。
 
 
 要回答的三個問題：
