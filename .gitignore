@@ -1,0 +1,20 @@
+# build artifacts
+wine-winusb-shim/build/
+*.o
+*.dll
+*.def
+
+# captures (see README "Tested versions" for the reference files)
+*.pcap
+*.pcapng
+
+# vendor binaries
+*.exe
+*.msi
+
+# logs and editor state
+*.log
+__pycache__/
+*.pyc
+.vscode/
+.idea/
