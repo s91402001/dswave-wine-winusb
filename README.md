@@ -5,7 +5,7 @@ Run the **Windows DSWave** application for the DreamSourceLab **DSCope M454**
 
 **English** | [繁體中文](README.zh-TW.md)
 
-> > **Status (2026-10-30)** — the full flow works under Wine: enumeration,
+> **Status (2026-10-30)** — the full flow works under Wine: enumeration,
 > FPGA self-configuration, 30-second captures and repeated Run→Stop→Run
 > cycles are all verified. **No Windows machine is needed any more** — replug
 > the device and DSWave configures the FPGA itself.

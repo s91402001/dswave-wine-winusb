@@ -728,7 +728,7 @@ app: usb device is not ready: ERROR
 | 項目 | 結果 |
 |---|---|
 | `cancelio.log` `matched pending, cancelled` | **8 次**（每次 Stop 都命中） |
-| helper `abort ep=86` + 以 `-10` 結束 | 6 次；其中一笔以 3,104,768/5,005,312 partial + `-10` 交還（語義正確） |
+| helper `abort ep=86` + 以 `-10` 結束 | 6 次；其中一筆以 3,104,768/5,005,312 partial + `-10` 交還（語義正確） |
 | App 送 `02 04 00` | 3 次（每個 Stop 一次） |
 | App 送 `02 08 00` | **301 次，均未觸發 abort**（v4 語義正確） |
 | 完整 chunk（status=0，5,005,312 bytes，timeouts=0） | **254 個**（≈64 s 串流） |
@@ -737,7 +737,7 @@ app: usb device is not ready: ERROR
 | UI | 無凍結、無錯誤對話框；三次 Run 波形正常 |
 
 **結論：Wine 下 Run→Stop→Run 穩定。**第二階段的 Stop 死結由
-「CancelIoEx 未挂鉤 ＋ abort 條件過寬」造成，兩者已修復並驗證。
+「CancelIoEx 未掛鉤 ＋ abort 條件過寬」造成，兩者已修復並驗證。
 
 ### 下一步（FPGA）
 - 序列差異已分析完成 → `docs/analysis/fpga-upload-sequence.md`：
@@ -790,7 +790,7 @@ app: usb device is not ready: ERROR
    它使裝置重新列舉，REQ_LIST 快取自動追上新位址（已在文件註明）。
 4. `tools/dswcfg.h`：補上來源說明（由 helper 控制日誌轉錄），
    `cfg_count` 改由陣列推導；`tools/README.md` 去重並補 dswbulk 的
-   config-replay 說明；分析文件 §2/§4 標記為歷史（v3 为准）。
+   config-replay 說明；分析文件 §2/§4 標記為歷史（v3 為準）。
 
 ### Review Focus 證據補記
 - **取消以 STATUS_CANCELLED 完成**：`winusb.log` 有

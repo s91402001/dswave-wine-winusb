@@ -752,6 +752,9 @@ static int fpga_prepare(libusb_device_handle *h)
 
     for (i = 0; i < sizeof(pre) / sizeof(pre[0]); i++)
     {
+        if (dbg())
+            fprintf(stderr, "helper: fpga pre: %02x %02x %02x %02x\n", pre[i].req,
+                    pre[i].d[0], pre[i].d[1], pre[i].d[2]);
         libusb_control_transfer(h, 0x40, pre[i].req, 0, 0,
                                 (unsigned char *)pre[i].d, 3, 2000);
         nanosleep(&ts, NULL);
@@ -772,6 +775,9 @@ static int fpga_prepare(libusb_device_handle *h)
     }
     for (i = 0; i < sizeof(prog) / sizeof(prog[0]); i++)
     {
+        if (dbg())
+            fprintf(stderr, "helper: fpga prog: %02x %02x %02x %02x\n", prog[i].req,
+                    prog[i].d[0], prog[i].d[1], prog[i].d[2]);
         libusb_control_transfer(h, 0x40, prog[i].req, 0, 0,
                                 (unsigned char *)prog[i].d, 3, 2000);
         nanosleep(&ts, NULL);
@@ -839,20 +845,16 @@ static void do_bulk(struct conn *c, const struct shim_req *req, struct shim_resp
     }
     if (!is_in && ep == 0x02 && req->len > 100000)
     {
-        /* FPGA bitstream upload: keep a copy so it can be replayed from Linux
-         * without a Windows VM. */
-        static int dumped;
-        if (!dumped)
+        /* FPGA bitstream upload: keep an up-to-date copy so it can be
+         * replayed from Linux without any Windows. Overwrite every time so
+         * the file never goes stale after an application/bitstream upgrade. */
+        FILE *f = fopen("/tmp/dswave-fpga.bin", "wb");
+        if (f)
         {
-            FILE *f = fopen("/tmp/dswave-fpga.bin", "wb");
-            if (f)
-            {
-                size_t wrote = fwrite(buf, 1, req->len, f);
-                fclose(f);
-                fprintf(stderr, "helper: FPGA bitstream %u bytes dumped to "
-                        "/tmp/dswave-fpga.bin (%zu written)\n", req->len, wrote);
-            }
-            dumped = 1;
+            size_t wrote = fwrite(buf, 1, req->len, f);
+            fclose(f);
+            fprintf(stderr, "helper: FPGA bitstream %u bytes dumped to "
+                    "/tmp/dswave-fpga.bin (%zu written)\n", req->len, wrote);
         }
     }
 

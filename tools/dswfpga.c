@@ -126,8 +126,16 @@ int main(int argc, char **argv)
     fseek(f, 0, SEEK_END);
     len = ftell(f);
     fseek(f, 0, SEEK_SET);
-    buf = malloc(len);
-    if (!buf || fread(buf, 1, len, f) != (size_t)len) { printf("read failed\n"); return 1; }
+    if (len <= 0 || (len % 512) != 0)
+        printf("warning: bitstream length %ld looks unusual (expected 466408)\n", len);
+    buf = malloc(len > 0 ? (size_t)len : 1);
+    if (!buf || fread(buf, 1, (size_t)len, f) != (size_t)len)
+    {
+        printf("read failed\n");
+        free(buf);
+        fclose(f);
+        return 1;
+    }
     fclose(f);
     printf("bitstream %ld bytes\n", len);
 
