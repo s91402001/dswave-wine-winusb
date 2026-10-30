@@ -181,6 +181,20 @@ WINEPREFIX=~/.wine-dswave wine "C:\\Program Files\\DSWave\\DSWave.exe" -l 5
 
 錄製方式：[`usbpcap/README.md`](usbpcap/README.md)。
 
+### 參考擷取檔
+
+兩份都在 Windows 11（VM）以 `USBPcapCMD.exe` 錄製，並以 gzip 壓縮收在
+[`usbpcap/data/`](usbpcap/data/README.md)。
+
+| 擷取檔 | 情境 | 長度 / 封包數 | 內容 |
+|---|---|---|---|
+| `fpga1.pcap` | **冷裝置**（剛重插、FPGA 尚未設定）→ 開啟 DSWave → FPGA bitstream 上傳 → SCPI 設定 → 擷取一次 → 按 Stop | 13.47 秒 / 2,818 | FPGA 上傳（`0x02` 單筆 bulk OUT 466,408 bytes）、405,504 bytes 的 bulk IN（間隔約 22 ms）、完整的 start/stop 控制序列、pending read 以 `0xC0010000` 結束 |
+| `output.pcap` | **一般擷取**：裝置已設定（無 FPGA 上傳）→ DSWave 啟動並連續擷取 → 停止 | 41.89 秒 / 7,881 | 持續的 bulk IN 流量，用於傳輸大小/時序統計；4096 bytes 標頭（`type=1`）、無傳輸錯誤 |
+
+`fpga1.pcap` 使用的設定：TimeBase 2 ms、400 kpts、類比 5 MSa/s、數位 100 MSa/s
+—— 也是 [`docs/progress.md`](docs/progress.md) 所有比對所用的設定。
+
+
 ---
 
 ## 開發筆記

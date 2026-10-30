@@ -185,6 +185,21 @@ not redistributed.
 
 Capture instructions: [`usbpcap/README.md`](usbpcap/README.md).
 
+### Reference captures
+
+Both were recorded on Windows 11 (VM) with `USBPcapCMD.exe` and are stored
+gzip-compressed in [`usbpcap/data/`](usbpcap/data/README.md).
+
+| Capture | Scenario | Duration / packets | What it shows |
+|---|---|---|---|
+| `fpga1.pcap` | **Cold device** (just replugged, FPGA *not* configured) → launch DSWave → FPGA bitstream upload → SCPI setup → one capture run → press Stop | 13.47 s / 2,818 | the FPGA upload (466,408 B in a single bulk OUT on `0x02`), 405,504-byte bulk IN reads ~22 ms apart, the complete start/stop control sequences, and the pending read finishing with `0xC0010000` |
+| `output.pcap` | **Normal capture**: device already configured (no FPGA upload), DSWave starts and runs continuously, then stops | 41.89 s / 7,881 | sustained bulk IN traffic used for transfer-size/timing statistics, 4096-byte header (`type=1`), no transfer errors |
+
+`fpga1.pcap` was taken with TimeBase 2 ms, 400 kpts, analog 5 MSa/s and digital
+100 MSa/s — the settings used for every comparison in
+[`docs/progress.md`](docs/progress.md).
+
+
 ---
 
 ## Development notes
