@@ -45,7 +45,7 @@ DSWave.exe (libusbK/libusb 靜態連結)
 | 列舉、`CreateFile`、`WinUsb_Initialize` | ✅ |
 | READY、波形、連續 30 秒擷取 | ✅ |
 | `Stop` → 再 `Run` | ✅（2026-10-30 三次循環驗證） |
-| FPGA bitstream 上傳 | ❌ 傳輸成功但裝置未設定（需 Windows VM） |
+| FPGA bitstream 上傳 | ✅ DSWave 自行完成（`DSW_FPGA_RECOVER` 預設開） |
 
 ## 建置與安裝
 
@@ -74,12 +74,12 @@ WINEPREFIX=~/.wine-dswave ./scripts/uninstall.sh   # 還原
 | `DSW_NO_RESET` | 0 | 開啟時不做 reset |
 | `DSW_LIST_LIVE` | 0 | 關閉 descriptor 快取 |
 | `DSW_SOFT_RESET` | 0 | 關閉時重放 stop 序列 |
-| `DSW_FPGA_RECOVER` | 0 | 上傳前 reset + 重放序列 |
+| `DSW_FPGA_RECOVER` | 1 | 上傳前以 idle-wait 重放序列（設 0 關閉） |
 | `DSW_CANCELIO_HOOK` | 1 | 啟用 CancelIoEx hook |
 
 ## 已知限制
 
 * 每筆 bulk 傳輸多一次 loopback TCP hop；低速率可用，全速需改 unixlib。
 * `setupapi=native` 會讓整個 prefix 都使用墊片（其餘呼叫已 forward）。
-* FPGA bitstream 上傳在 Wine 下尚未成功；每次斷電後需用 Windows VM
-  設定一次。
+* FPGA 設定需要 helper 的 idle-wait 重放（`DSW_FPGA_RECOVER=1`，預設）；
+  純 App 序列在部分狀態下會把 FPGA 留在未設定。

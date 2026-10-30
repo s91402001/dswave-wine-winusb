@@ -5,10 +5,10 @@ Run the **Windows DSWave** application for the DreamSourceLab **DSCope M454**
 
 **English** | [繁體中文](README.zh-TW.md)
 
-> > **Status (2026-10-30)** — enumeration, capture and Start/Stop all work:
-> 30-second captures and repeated Run→Stop→Run cycles are verified. The FPGA
-> bitstream upload still does not complete under Wine (a one-time configure
-> from a Windows VM is required after every power cycle).
+> > **Status (2026-10-30)** — the full flow works under Wine: enumeration,
+> FPGA self-configuration, 30-second captures and repeated Run→Stop→Run
+> cycles are all verified. **No Windows machine is needed any more** — replug
+> the device and DSWave configures the FPGA itself.
 
 ---
 
@@ -20,8 +20,8 @@ Run the **Windows DSWave** application for the DreamSourceLab **DSCope M454**
 | `H0: DSCope M454` tab, READY | ✅ | `Fpga is already done` when the FPGA is configured |
 | Capture / waveform rendering | ✅ | 30+ seconds, zero `-EPROTO` after the fixes |
 | `Stop` → `Run` again | ✅ | Verified 2026-10-30: 3 run/stop cycles cancel cleanly (`CancelIoEx` hook) |
-| FPGA bitstream upload | ❌ | Transfer completes but the FPGA does not configure (see Roadmap) |
-| Replug without Windows | ❌ | Requires a Windows VM to configure the FPGA once |
+| FPGA bitstream upload | ✅ | DSWave configures it itself; the helper keeps the device in the idle state through PROG (`DSW_FPGA_RECOVER`, on by default) |
+| Replug without Windows | ✅ | Cold device → DSWave → READY, verified 2026-10-30 |
 
 ---
 
@@ -77,7 +77,7 @@ bulk-transfer lifecycle and the status-code mapping.
 * `mingw-w64` cross compiler (`x86_64-w64-mingw32-gcc`)
 * Python 3 (used by `scripts/gen_def.py`)
 * A Wine prefix with **DSWave v1.1.0** installed
-* The device, already FPGA-configured (see the status table)
+* The device in any state — cold is fine, the app configures the FPGA itself
 
 ---
 
@@ -140,7 +140,7 @@ Uninstall: `WINEPREFIX=~/.wine-dswave ./scripts/uninstall.sh`.
 | `DSW_NO_RESET` | `0` | skip `libusb_reset_device()` on first open |
 | `DSW_LIST_LIVE` | `0` | disable the descriptor cache (debug only) |
 | `DSW_SOFT_RESET` | `0` | replay the stop sequence when the device is closed |
-| `DSW_FPGA_RECOVER` | `0` | reset + replay the pre-upload sequence before a bitstream upload |
+| `DSW_FPGA_RECOVER` | `1` | replay the pre-upload sequence with the idle-wait before a bitstream upload (`0` to disable) |
 | `DSW_CANCELIO_HOOK` | `1` | enable the `CancelIoEx` hook |
 
 ---
@@ -151,7 +151,7 @@ Uninstall: `WINEPREFIX=~/.wine-dswave ./scripts/uninstall.sh`.
 |---|---|
 | `LIBUSB_ERROR_ACCESS` when opening | `winusb.dll` lost its exports — rebuild with `-Wl,--export-all-symbols` and check `objdump -p build/winusb.dll \| grep WinUsb_` |
 | `LIBUSB_ERROR_BUSY` (`claim interface`) | `virt-manager`/QEMU still holds the device; detach the USB redirection |
-| READY, but `Run` shows nothing | device is wedged: reconfigure the FPGA from the Windows VM, or replug |
+| READY, but `Run` shows nothing | device is wedged: replug and restart (FPGA self-configure is on by default) |
 | UI freezes on `Stop` | enable `DSW_DEBUG=1`; inspect `cancelio.log` and the helper log |
 | Waveform stops after ~1 s | check for `-EPROTO` (urb status `-71`) in the helper log |
 
@@ -231,11 +231,12 @@ usbpcap/              capture & parse helpers (Windows / Linux)
 
 1. ~~Finish the `Stop` → `Run` fix~~ — done 2026-10-30, see
    [`docs/progress.md`](docs/progress.md).
-2. Make the FPGA bitstream upload work under Wine. The sequence diff is now
-   documented in [`docs/analysis/fpga-upload-sequence.md`](docs/analysis/fpga-upload-sequence.md):
-   Windows ends the upload with a **zero-length IN on `0x82`** and confirms
-   with the `b2` status read (`03 00` → `83 00`); our replay skips both.
-   Verify natively with `tools/dswfpga`, then port to the helper.
+2. ~~Make the FPGA bitstream upload work under Wine~~ — done 2026-10-30.
+   The root cause (the device must be idle, `b2 == 03 00`, before the PROG
+   pulse; the `0x82` zero-length IN in the Windows pcap never reaches the
+   wire) is documented in
+   [`docs/analysis/fpga-upload-sequence.md`](docs/analysis/fpga-upload-sequence.md);
+   implemented in `tools/dswfpga` and in the helper's default path.
 3. Notify the app (`WM_DEVICECHANGE`) when the device re-enumerates.
 4. Optional: automated capture smoke test.
 

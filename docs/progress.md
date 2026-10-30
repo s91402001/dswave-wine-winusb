@@ -745,3 +745,32 @@ app: usb device is not ready: ERROR
   （`03 00` → `83 00`）判定完成；我們的 `dswfpga` 缺這兩步、
   且結尾多送 `b1 f0 02 00`。
 - 依該文件第 4 節規格修 `dswfpga`（v2），在冷裝置上原生重試。
+
+---
+
+## 2026-10-30 第四階段：FPGA 自行設定打通（不再需要 Windows）
+
+### 根因（見 `docs/analysis/fpga-upload-sequence.md` 的修正節）
+- `b0 fc e8 1d`（PROG）之前裝置必須處於 idle：`b2 == 03 00`。
+  v1/v2 在 `01 00`（忙碌）狀態下 PROG → 上傳完成但 FPGA 永不設定。
+- pcap 中 `0x82` 的 zero-length IN **不會出現在 bus 上**（裝置沒有 EP 0x82），
+  與失敗無關（假設 1 證偽）。
+
+### dswfpga v3（`tools/`）
+- 指令間 15 ms + PROG 前輪詢 `03 00` + 整段序列最多 3 次重試、去掉結尾 `f0`。
+- 冷裝置（剛拔插）**第一次嘗試**即 `b2 → 83 00` CONFIGURED，
+  不需要 USB reset、不需要 ZLP、不需要 VM。
+
+### 移植到 helper（`DSW_FPGA_RECOVER` 改為預設開）
+- `fpga_prepare()` 拆兩段：前置指令（15 ms 間隔）→ 等待 `03 00` →
+  `fc e8 1d` / `fd 07 00`，App 的 466,408-byte OUT 照常接在後面。
+
+### 2026-10-30 16:57 端到端驗證（冷裝置、純 Linux + Wine）
+- 拔插（冷）→ 起 helper（`DSW_FPGA_RECOVER=1`）→ 起 DSWave：
+  `BSP: Start FPGA configure: 466408` → `FPGA configure done: 466408`（0.3 s）
+  → `status: READY`，無 timeout。
+- 第一次 Run：**63 個完整 chunk（5,005,312 bytes、status=0、timeouts=0）**，
+  `-EPROTO` 0 次；Run/Stop 反覆操作正常。
+- `DSW_FPGA_RECOVER` 預設值改為 `1`（`0` 可關閉）。
+
+**狀態總結：列舉 → FPGA 設定 → 擷取 → Stop → 再擷取，全程不需 Windows。**

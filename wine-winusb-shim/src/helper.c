@@ -693,23 +693,38 @@ static int fpga_recover_enabled(void)
     if (on < 0)
     {
         const char *e = getenv("DSW_FPGA_RECOVER");
-        on = (e && *e && *e != '0') ? 1 : 0;
+        on = (e && *e == '0') ? 0 : 1; /* on by default */
     }
     return on;
 }
 
-/* The FX3 only accepts the bitstream right after a USB reset; sending it in a
- * later session (or after any other activity) makes the bulk OUT NAK forever.
- * Replaying "reset -> pre-upload sequence" immediately before the transfer is
- * what makes the upload succeed outside Windows (verified with /tmp/dswfpga). */
+/* Vendor status read c0 b2, 2 bytes; byte0 03 = idle/unconfigured, 0x80 bit =
+ * configured. Returns byte0 or a negative libusb error. */
+static int fpga_b2(libusb_device_handle *h)
+{
+    unsigned char b[2] = {0, 0};
+    int r = libusb_control_transfer(h, 0xC0, 0xB2, 0, 0, b, 2, 5000);
+    return r == 2 ? b[0] : r;
+}
+
+/* Replay the pre-upload sequence just before the app's bitstream OUT.
+ * dswfpga v3 (tools/) pinned the exact recipe: Windows always reads b2 ==
+ * 03 00 (idle, unconfigured) right before the PROG pulse, spacing commands
+ * ~15 ms apart. Uploading while the device is still busy (b2 == 01) leaves
+ * the FPGA unconfigured. The zero-length IN seen in the pcap is host-side
+ * only (the device has no EP 0x82), so it is not replayed here. */
 static void fpga_prepare(libusb_device_handle *h)
 {
-    static const struct { uint8_t req; uint8_t d[3]; } seq[] = {
+    /* pre-PROG commands (PROG + init are issued after the idle wait) */
+    static const struct { uint8_t req; uint8_t d[3]; } pre[] = {
         {0xb1, {0xf0, 0x02, 0x00}}, {0xb1, {0xf2, 0x02, 0x00}},
         {0xb1, {0xff, 0x02, 0x00}}, {0xb0, {0xfe, 0xfe, 0xff}},
         {0xb0, {0xfe, 0x01, 0x00}}, {0xb1, {0xff, 0x02, 0x00}},
+    };
+    static const struct { uint8_t req; uint8_t d[3]; } prog[] = {
         {0xb0, {0xfc, 0xe8, 0x1d}}, {0xb0, {0xfd, 0x07, 0x00}},
     };
+    struct timespec ts = {0, 15 * 1000 * 1000}; /* 15 ms */
     size_t i;
     int r;
 
@@ -719,9 +734,29 @@ static void fpga_prepare(libusb_device_handle *h)
     libusb_set_configuration(h, 1);
     r = libusb_claim_interface(h, 0);
     fprintf(stderr, "helper: fpga prepare: claim -> %s\n", libusb_error_name(r));
-    for (i = 0; i < sizeof(seq) / sizeof(seq[0]); i++)
-        libusb_control_transfer(h, 0x40, seq[i].req, 0, 0,
-                                (unsigned char *)seq[i].d, 3, 2000);
+
+    for (i = 0; i < sizeof(pre) / sizeof(pre[0]); i++)
+    {
+        libusb_control_transfer(h, 0x40, pre[i].req, 0, 0,
+                                (unsigned char *)pre[i].d, 3, 2000);
+        nanosleep(&ts, NULL);
+    }
+    /* wait for the idle state before pulsing PROG */
+    for (i = 0; i < 10; i++)
+    {
+        r = fpga_b2(h);
+        if (r == 0x03)
+            break;
+        struct timespec one = {1, 0};
+        fprintf(stderr, "helper: fpga prepare: not idle yet b2=%d, waiting\n", r);
+        nanosleep(&one, NULL);
+    }
+    for (i = 0; i < sizeof(prog) / sizeof(prog[0]); i++)
+    {
+        libusb_control_transfer(h, 0x40, prog[i].req, 0, 0,
+                                (unsigned char *)prog[i].d, 3, 2000);
+        nanosleep(&ts, NULL);
+    }
 }
 
 struct bulk_wait

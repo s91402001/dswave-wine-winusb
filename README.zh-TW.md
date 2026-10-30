@@ -5,9 +5,9 @@
 
 [English](README.md) | **繁體中文**
 
-> **狀態（2026-10-30）** — 裝置列舉、擷取與 Start/Stop 均可用：
-> 連續 30 秒擷取與多次 Run→Stop→Run 已驗證。FPGA bitstream 在 Wine 下
-> 仍無法完成設定（每次斷電後需要用 Windows VM 設定一次）。
+> **狀態（2026-10-30）** — 完整流程在 Wine 下可用：列舉、FPGA 自行
+> 設定、連續 30 秒擷取與多次 Run→Stop→Run 均已驗證。**不再需要任何
+> Windows 環境** — 重新插拔後 DSWave 會自己完成 FPGA 設定。
 
 ---
 
@@ -19,8 +19,8 @@
 | `H0: DSCope M454`、READY | ✅ | FPGA 已設定時顯示 `Fpga is already done` |
 | 擷取 / 波形 | ✅ | 30 秒以上、修正後 0 次 `-EPROTO` |
 | `Stop` → 再 `Run` | ✅ | 已驗證（2026-10-30，三次 Run/Stop 循環，CancelIoEx hook 乾淨取消） |
-| FPGA bitstream 上傳 | ❌ | 傳輸完成但 FPGA 未實際設定（見 Roadmap） |
-| 免 Windows 重新插拔 | ❌ | 需要 Windows VM 設定 FPGA 一次 |
+| FPGA bitstream 上傳 | ✅ | DSWave 自行設定；helper 在 PROG 前維持裝置 idle（`DSW_FPGA_RECOVER`，預設開） |
+| 免 Windows 重新插拔 | ✅ | 冷裝置 → DSWave → READY，2026-10-30 驗證 |
 
 ---
 
@@ -76,7 +76,7 @@ RPC 協定、bulk 傳輸生命週期與狀態碼對照請見
 * `mingw-w64` 交叉編譯器（`x86_64-w64-mingw32-gcc`）
 * Python 3（`scripts/gen_def.py` 使用）
 * 已安裝 **DSWave v1.1.0** 的 Wine prefix
-* 已設定好 FPGA 的裝置（見狀態表）
+* 裝置任意狀態皆可 — 冷裝置也行，App 會自己設定 FPGA
 
 ---
 
@@ -138,7 +138,7 @@ WINEPREFIX=~/.wine-dswave wine "C:\\Program Files\\DSWave\\DSWave.exe" -l 5
 | `DSW_NO_RESET` | `0` | 第一次開啟時不做 `libusb_reset_device()` |
 | `DSW_LIST_LIVE` | `0` | 關閉 descriptor 快取（僅除錯） |
 | `DSW_SOFT_RESET` | `0` | 關閉裝置時重放 stop 序列 |
-| `DSW_FPGA_RECOVER` | `0` | bitstream 上傳前先 reset + 重放前置序列 |
+| `DSW_FPGA_RECOVER` | `1` | 上傳前以 idle-wait 重放序列（設 `0` 關閉） |
 | `DSW_CANCELIO_HOOK` | `1` | 啟用 `CancelIoEx` hook |
 
 ---
@@ -149,7 +149,7 @@ WINEPREFIX=~/.wine-dswave wine "C:\\Program Files\\DSWave\\DSWave.exe" -l 5
 |---|---|
 | 開啟時 `LIBUSB_ERROR_ACCESS` | `winusb.dll` 匯出遺失 — 用 `-Wl,--export-all-symbols` 重建，並以 `objdump -p build/winusb.dll \| grep WinUsb_` 確認 |
 | `claim interface` 回 `LIBUSB_ERROR_BUSY` | `virt-manager` / QEMU 仍持有裝置，解除 USB redirection |
-| READY 但 `Run` 沒資料 | 裝置卡死：用 Windows VM 重新設定 FPGA，或重新插拔 |
+| READY 但 `Run` 沒資料 | 裝置卡死：重新插拔並重啟（FPGA 自行設定預設開啟） |
 | `Stop` 時 UI 凍結 | 設 `DSW_DEBUG=1`，檢查 `cancelio.log` 與 helper log |
 | 波形約 1 秒後停止 | 在 helper log 找 `-EPROTO`（urb status `-71`） |
 
@@ -224,10 +224,11 @@ usbpcap/              擷取與解析工具（Windows / Linux）
 
 1. ~~完成 `Stop` → 再 `Run` 的修正~~ — 已於 2026-10-30 完成，
    見 [`docs/progress.md`](docs/progress.md)。
-2. 讓 FPGA bitstream 在 Wine 下真正完成設定。序列差異已分析完成：
-   見 [`docs/analysis/fpga-upload-sequence.md`](docs/analysis/fpga-upload-sequence.md)
-   （上傳後缺 **`0x82` zero-length IN** 與 `b2` 完成輪詢）；
-   先用 `tools/dswfpga` 原生驗證，再移植進 helper。
+2. ~~讓 FPGA bitstream 在 Wine 下真正完成設定~~ — 已於 2026-10-30 完成。
+   根因（PROG 前裝置必須 idle，`b2 == 03 00`；pcap 中的 `0x82`
+   zero-length IN 不會上 bus）記錄在
+   [`docs/analysis/fpga-upload-sequence.md`](docs/analysis/fpga-upload-sequence.md)；
+   實作於 `tools/dswfpga` 與 helper 預設路徑。
 3. 裝置重新列舉時通知 App（`WM_DEVICECHANGE`）。
 4. 選配：自動化擷取 smoke test。
 

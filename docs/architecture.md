@@ -176,8 +176,11 @@ control commands.
 
 ## 7. Known limitations
 
-* The FPGA bitstream upload completes at the USB level but the device still
-  reports "not configured"; a Windows VM is required after each power cycle.
+* The FPGA bitstream upload only configures the device if the helper
+  replays the sequence with the **idle wait** (`b2 == 03 00` before the
+  PROG pulse, `DSW_FPGA_RECOVER`, on by default); the app's raw sequence
+  can otherwise PROG while the device is busy (`b2 == 01 00`) and leave
+  the FPGA unconfigured.
 * Device re-enumeration is not announced to the app with `WM_DEVICECHANGE`,
   so a stale handle can survive until the app rescans.
 * The helper is a separate process; restarting it closes the device.
