@@ -62,6 +62,15 @@
 
 ## 3. 假設排序（Task 6 依序驗證）
 
+> **2026-10-30 Task 6 結果（修正本節）**：假設 1 已證偽 — 裝置
+> **沒有 EP 0x82**（描述符只有 `0x02 OUT / 0x86 IN / 0x84 IN`），且
+> 0-length bulk 傳輸根本不會上 bus，pcap 裡那筆「ZLP IN」是 host 端
+> 完成的記錄。真正關鍵是**假設 3 的反面**：Windows 在 `fc e8 1d`(PROG)
+> 之前一定先讀到 `b2 = 03 00`（idle）；我們的 v1 在 `01 00` 狀態下
+> 直接 PROG+上傳 → 永不設定。v3 = 指令間 15 ms + PROG 前輪詢等待
+> `03 00` + 整段序列最多 3 次重試 → **首次嘗試即 `83 00` CONFIGURED**
+> （不需 USB reset、不需 ZLP、不需 VM）。
+
 1. **缺 EP2 zero-length IN**：FPGA 載入協定可能需要一個 ZLP IN 作為「資料結束/沖刷」；沒有它，bitstream 進得去但載入器不收尾 → 上傳 status=0 但 b2 仍 `03 00`。與我們的觀察完全吻合。
 2. **結尾多送的 `b1 f0 02 00`**：把 f0（programmer start）當結尾指令是誤讀；可能在 fd 07 00/ff 之後又把 programmer 重啟。
 3. **缺 b2 poll**：不影響設定與否，但沒有它我們無法判定；Windows 靠 b2（0x80 位）判斷完成。
