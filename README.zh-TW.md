@@ -5,9 +5,9 @@
 
 [English](README.md) | **繁體中文**
 
-> **狀態（2026-10-30）** — 裝置列舉與擷取可用，連續 30 秒擷取正常。
-> `Stop` 穩定性仍在驗證；FPGA bitstream 在 Wine 下尚無法完成設定
-> （每次斷電後需要用 Windows VM 設定一次）。
+> **狀態（2026-10-30）** — 裝置列舉、擷取與 Start/Stop 均可用：
+> 連續 30 秒擷取與多次 Run→Stop→Run 已驗證。FPGA bitstream 在 Wine 下
+> 仍無法完成設定（每次斷電後需要用 Windows VM 設定一次）。
 
 ---
 
@@ -18,7 +18,7 @@
 | 裝置列舉 | ✅ | 合成 PnP 樹 + hub IOCTL |
 | `H0: DSCope M454`、READY | ✅ | FPGA 已設定時顯示 `Fpga is already done` |
 | 擷取 / 波形 | ✅ | 30 秒以上、修正後 0 次 `-EPROTO` |
-| `Stop` → 再 `Run` | ⚠️ | 驗證中，見 `docs/progress.md` |
+| `Stop` → 再 `Run` | ✅ | 已驗證（2026-10-30，三次 Run/Stop 循環，CancelIoEx hook 乾淨取消） |
 | FPGA bitstream 上傳 | ❌ | 傳輸完成但 FPGA 未實際設定（見 Roadmap） |
 | 免 Windows 重新插拔 | ❌ | 需要 Windows VM 設定 FPGA 一次 |
 
@@ -222,9 +222,12 @@ usbpcap/              擷取與解析工具（Windows / Linux）
 
 ## Roadmap
 
-1. 完成 `Stop` → 再 `Run` 的修正並使其穩定。
-2. 讓 FPGA bitstream 在 Wine 下真正完成設定（單筆上傳已驗證，
-   但裝置仍回報未設定）。
+1. ~~完成 `Stop` → 再 `Run` 的修正~~ — 已於 2026-10-30 完成，
+   見 [`docs/progress.md`](docs/progress.md)。
+2. 讓 FPGA bitstream 在 Wine 下真正完成設定。序列差異已分析完成：
+   見 [`docs/analysis/fpga-upload-sequence.md`](docs/analysis/fpga-upload-sequence.md)
+   （上傳後缺 **`0x82` zero-length IN** 與 `b2` 完成輪詢）；
+   先用 `tools/dswfpga` 原生驗證，再移植進 helper。
 3. 裝置重新列舉時通知 App（`WM_DEVICECHANGE`）。
 4. 選配：自動化擷取 smoke test。
 

@@ -707,3 +707,41 @@ app: usb device is not ready: ERROR
 - `Bus 008 Device 015`
 - 最後一次 Stop 未送出 `02 04 00`，裝置可能又處於卡死狀態
 - 需要 VM 重新設定 FPGA（或重新插拔）才能再測
+
+---
+
+## 2026-10-30 第三階段：Stop 已解（v4 + CancelIoEx hook）
+
+### 修正內容（v4）
+1. **只有 `02 04 00`（FIFO reset）會 abort pending IN**；
+   `01 00 00`、`02 08 00` 改用於擷取中的 flow-pause／重新設定，不再 abort
+   （v3 會把正常串流殺掉）。
+2. **`CancelIoEx` IAT hook**（`install: dioc=1 cancelio=1 ciocp=1`）：
+   命中 in-flight OVERLAPPED 時立即以 `STATUS_CANCELLED` post completion，
+   並送 `REQ_ABORT_PIPE` 讓 helper 解除 USB 傳輸。
+
+### 2026-10-30 16:39 整合測試（裝置先經 Windows VM 設定 FPGA 後交還 Linux）
+序列：Run → 15 s 處改擷取設定 → Stop → Run → Stop → Run → Stop（3 個循環）
+
+證據（helper / shim 日誌）：
+
+| 項目 | 結果 |
+|---|---|
+| `cancelio.log` `matched pending, cancelled` | **8 次**（每次 Stop 都命中） |
+| helper `abort ep=86` + 以 `-10` 結束 | 6 次；其中一笔以 3,104,768/5,005,312 partial + `-10` 交還（語義正確） |
+| App 送 `02 04 00` | 3 次（每個 Stop 一次） |
+| App 送 `02 08 00` | **301 次，均未觸發 abort**（v4 語義正確） |
+| 完整 chunk（status=0，5,005,312 bytes，timeouts=0） | **254 個**（≈64 s 串流） |
+| `-EPROTO` | **0** |
+| 停止時的 `0x84` 1-byte 輪詢 | 出現 ×3（與 Windows 序列一致） |
+| UI | 無凍結、無錯誤對話框；三次 Run 波形正常 |
+
+**結論：Wine 下 Run→Stop→Run 穩定。**第二階段的 Stop 死結由
+「CancelIoEx 未挂鉤 ＋ abort 條件過寬」造成，兩者已修復並驗證。
+
+### 下一步（FPGA）
+- 序列差異已分析完成 → `docs/analysis/fpga-upload-sequence.md`：
+  Windows 成功流程在上傳後有 **EP2 zero-length IN** 並以 `b2` 讀取
+  （`03 00` → `83 00`）判定完成；我們的 `dswfpga` 缺這兩步、
+  且結尾多送 `b1 f0 02 00`。
+- 依該文件第 4 節規格修 `dswfpga`（v2），在冷裝置上原生重試。

@@ -44,7 +44,7 @@ DSWave.exe (libusbK/libusb 靜態連結)
 |---|---|
 | 列舉、`CreateFile`、`WinUsb_Initialize` | ✅ |
 | READY、波形、連續 30 秒擷取 | ✅ |
-| `Stop` → 再 `Run` | ⚠️ 驗證中 |
+| `Stop` → 再 `Run` | ✅（2026-10-30 三次循環驗證） |
 | FPGA bitstream 上傳 | ❌ 傳輸成功但裝置未設定（需 Windows VM） |
 
 ## 建置與安裝

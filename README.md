@@ -5,10 +5,10 @@ Run the **Windows DSWave** application for the DreamSourceLab **DSCope M454**
 
 **English** | [繁體中文](README.zh-TW.md)
 
-> **Status (2026-10-30)** — device enumeration and capture work; a 30-second
-> capture runs cleanly. `Stop` reliability is still being tested, and the FPGA
-> bitstream upload does not work under Wine yet (a one-time configure from a
-> Windows VM is required after every power cycle).
+> > **Status (2026-10-30)** — enumeration, capture and Start/Stop all work:
+> 30-second captures and repeated Run→Stop→Run cycles are verified. The FPGA
+> bitstream upload still does not complete under Wine (a one-time configure
+> from a Windows VM is required after every power cycle).
 
 ---
 
@@ -19,7 +19,7 @@ Run the **Windows DSWave** application for the DreamSourceLab **DSCope M454**
 | Device enumeration | ✅ | Synthetic PnP tree + hub IOCTLs |
 | `H0: DSCope M454` tab, READY | ✅ | `Fpga is already done` when the FPGA is configured |
 | Capture / waveform rendering | ✅ | 30+ seconds, zero `-EPROTO` after the fixes |
-| `Stop` → `Run` again | ⚠️ | Under test; see `docs/progress.md` |
+| `Stop` → `Run` again | ✅ | Verified 2026-10-30: 3 run/stop cycles cancel cleanly (`CancelIoEx` hook) |
 | FPGA bitstream upload | ❌ | Transfer completes but the FPGA does not configure (see Roadmap) |
 | Replug without Windows | ❌ | Requires a Windows VM to configure the FPGA once |
 
@@ -229,9 +229,13 @@ usbpcap/              capture & parse helpers (Windows / Linux)
 
 ## Roadmap
 
-1. Finish the `Stop` → `Run` fix and make it deterministic.
-2. Make the FPGA bitstream upload work under Wine (single-transfer upload is
-   already verified; the device still reports "not configured").
+1. ~~Finish the `Stop` → `Run` fix~~ — done 2026-10-30, see
+   [`docs/progress.md`](docs/progress.md).
+2. Make the FPGA bitstream upload work under Wine. The sequence diff is now
+   documented in [`docs/analysis/fpga-upload-sequence.md`](docs/analysis/fpga-upload-sequence.md):
+   Windows ends the upload with a **zero-length IN on `0x82`** and confirms
+   with the `b2` status read (`03 00` → `83 00`); our replay skips both.
+   Verify natively with `tools/dswfpga`, then port to the helper.
 3. Notify the app (`WM_DEVICECHANGE`) when the device re-enumerates.
 4. Optional: automated capture smoke test.
 
